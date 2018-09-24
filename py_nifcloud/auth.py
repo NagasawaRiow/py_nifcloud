@@ -1,16 +1,23 @@
 # -*- encoding:utf-8 -*-
-from botocore.auth import SigV2Auth
-from botocore.awsrequest import AWSRequest
-from botocore.credentials import Credentials
-import hmac
-import hashlib
 import base64
+import hashlib
+import hmac
 import logging
 import time
+
+from botocore.auth import SigV2Auth, SigV4Auth
+from botocore.awsrequest import AWSRequest
+from botocore.credentials import Credentials
 
 logger = logging.getLogger(__name__)
 
 ISO8601 = '%Y-%m-%dT%H:%M:%SZ'
+
+
+class NifCloudSigV4Auth(SigV4Auth):
+
+    def __init__(self, credentials: Credentials, service_name, region_name):
+        super().__init__(credentials, service_name, region_name)
 
 
 class NifCloudSigV2Auth(SigV2Auth):
@@ -46,7 +53,8 @@ class NifCloudSigV1Auth:
         string_to_sign = ""
         for k, v in sorted_params:
             string_to_sign += "{key}{value}".format(key=k, value=v)
-        lhmac = hmac.new(self.credentials.secret_key.encode('utf-8'), digestmod=hashlib.sha1)
+        lhmac = hmac.new(self.credentials.secret_key.encode(
+            'utf-8'), digestmod=hashlib.sha1)
         lhmac.update(string_to_sign.encode('utf-8'))
         return base64.b64encode(lhmac.digest()).strip().decode('utf-8')
 
@@ -69,8 +77,10 @@ class NifCloudSigV0Auth:
         self.credentials = credentials
 
     def calc_signature(self, params: dict) -> str:
-        string_to_sign = '{action}{timestamp}'.format(action=params["Action"], timestamp=params["Timestamp"])
-        lhmac = hmac.new(self.credentials.secret_key.encode('utf-8'), digestmod=hashlib.sha1)
+        string_to_sign = '{action}{timestamp}'.format(
+            action=params["Action"], timestamp=params["Timestamp"])
+        lhmac = hmac.new(self.credentials.secret_key.encode(
+            'utf-8'), digestmod=hashlib.sha1)
         lhmac.update(string_to_sign.encode('utf-8'))
         return base64.b64encode(lhmac.digest()).strip().decode('utf-8')
 

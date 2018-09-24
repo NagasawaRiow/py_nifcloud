@@ -1,10 +1,13 @@
 # -*- encoding:utf-8 -*-
-from botocore.credentials import Credentials
-from botocore.awsrequest import AWSRequest
-from py_nifcloud.auth import NifCloudSigV2Auth, NifCloudSigV1Auth, NifCloudSigV0Auth
 import os
-import yaml
+from urllib import parse
+
 import requests
+import yaml
+from botocore.awsrequest import AWSRequest
+from botocore.credentials import Credentials
+from py_nifcloud.auth import (NifCloudSigV0Auth, NifCloudSigV1Auth,
+                              NifCloudSigV2Auth, NifCloudSigV4Auth)
 
 
 class NifCloudClient(object):
@@ -49,7 +52,8 @@ class NifCloudClient(object):
         else:
             self.ACCESS_KEY_ID = os.getenv("ACCESS_KEY_ID")
         if hasattr(self, "SECRET_ACCESS_KEY"):
-            self.SECRET_ACCESS_KEY = os.getenv("SECRET_ACCESS_KEY", self.SECRET_ACCESS_KEY)
+            self.SECRET_ACCESS_KEY = os.getenv(
+                "SECRET_ACCESS_KEY", self.SECRET_ACCESS_KEY)
         else:
             self.SECRET_ACCESS_KEY = os.getenv("SECRET_ACCESS_KEY")
 
@@ -60,7 +64,8 @@ class NifCloudClient(object):
             self.SECRET_ACCESS_KEY = secret_access_key
 
         # 認証情報を生成
-        self.CREDENTIALS = Credentials(self.ACCESS_KEY_ID, self.SECRET_ACCESS_KEY)
+        self.CREDENTIALS = Credentials(
+            self.ACCESS_KEY_ID, self.SECRET_ACCESS_KEY)
 
         self.SERVICE_NAME = service_name
         self.REGION_NAME = region_name
@@ -91,10 +96,23 @@ class NifCloudClient(object):
         if headers is None:
             headers = {}
 
-        request = AWSRequest(method=method, url=self._make_endpoint_url(path), data=query, headers=headers)
+        url_query = ""
+        if method == "GET":
+            l = []
+            for key in sorted(query):
+                value = str(query[key])
+                l.append('%s=%s' % (key, value))
+            url_query = '?' + '&'.join(l)
+            query = {}
+        url = self._make_endpoint_url(path) + url_query
+        request = AWSRequest(method=method, url=url,
+                             data=query, headers=headers)
 
-        signature_version = self._get_signature_version(request)
-        if signature_version == "2":
+        signature_version = self._get_signature_version(request, url)
+        if signature_version == "4":
+            NifCloudSigV4Auth(self.CREDENTIALS, service_name=self.SERVICE_NAME,
+                              region_name=self.REGION_NAME).add_auth(request)
+        elif signature_version == "2":
             NifCloudSigV2Auth(self.CREDENTIALS).add_auth(request)
         elif signature_version == "1":
             NifCloudSigV1Auth(self.CREDENTIALS).add_auth(request)
@@ -122,7 +140,8 @@ class NifCloudClient(object):
         service = self.SERVICE_NAME + "." if self.SERVICE_NAME else ""
         region = self.REGION_NAME + "." if self.REGION_NAME else ""
         path_param = self.BASE_PATH + "/" if self.BASE_PATH else ""
-        path_param = path_param + self.API_VERSION + "/" if self.API_VERSION else path_param
+        path_param = path_param + self.API_VERSION + \
+            "/" if self.API_VERSION else path_param
         path_param = path_param + path + "/" if path else path_param
 
         endpoint_url = "{protocol}://{service}{region}{api_domain}/{path}".format(
@@ -130,15 +149,20 @@ class NifCloudClient(object):
 
         return endpoint_url
 
-    def _get_signature_version(self, request):
+    def _get_signature_version(self, request, url):
         """
         リクエストとサービス名を元にsignature_versionを返却
         :param request:
+        :param url:
         :return:
         """
 
         params = request.data
-        if 'SignatureVersion' in params:
+        query = dict(parse.parse_qsl(parse.urlsplit(url).query))
+
+        if 'SignatureVersion' in query:
+            return query['SignatureVersion']
+        elif 'SignatureVersion' in params:
             return params['SignatureVersion']
         elif 'computing' in self.SERVICE_NAME:
             return '2'
@@ -146,4 +170,3 @@ class NifCloudClient(object):
         else:
             # サービス毎の定義がない場合のデフォルト値
             return '2'
-
