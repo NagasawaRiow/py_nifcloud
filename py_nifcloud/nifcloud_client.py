@@ -125,9 +125,9 @@ class NifCloudClient(object):
 
         # HTTPメソッドに合わせてリクエスト
         if request.method == "GET":
-            return requests.get(request.url, request.data, **kwargs)
+            return requests.get(request.url, request.data, headers=request.headers, **kwargs)
         elif request.method == "POST":
-            return requests.post(request.url, request.data, **kwargs)
+            return requests.post(request.url, request.data, headers=request.headers, **kwargs)
 
     def _make_endpoint_url(self, path=None):
         """
