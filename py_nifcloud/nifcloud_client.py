@@ -169,4 +169,4 @@ class NifCloudClient(object):
             #  TODO:各サービスが対応している最大値を定義していく
         else:
             # サービス毎の定義がない場合のデフォルト値
-            return '2'
+            return '4'
