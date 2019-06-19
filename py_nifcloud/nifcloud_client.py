@@ -157,16 +157,4 @@ class NifCloudClient(object):
         :return:
         """
 
-        params = request.data
-        query = dict(parse.parse_qsl(parse.urlsplit(url).query))
-
-        if 'SignatureVersion' in query:
-            return query['SignatureVersion']
-        elif 'SignatureVersion' in params:
-            return params['SignatureVersion']
-        elif 'computing' in self.SERVICE_NAME:
-            return '2'
-            #  TODO:各サービスが対応している最大値を定義していく
-        else:
-            # サービス毎の定義がない場合のデフォルト値
-            return '4'
+        return self.SIGNATURE_VERSION
